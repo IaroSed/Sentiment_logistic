@@ -23,29 +23,9 @@ import pandas as pd
 nltk.download('twitter_samples')
 nltk.download('stopwords')
 
-# select the set of positive and negative tweets
-all_positive_tweets = twitter_samples.strings('positive_tweets.json')
-all_negative_tweets = twitter_samples.strings('negative_tweets.json')
-
-tweets = all_positive_tweets + all_negative_tweets
-
-# split the data into two pieces, one for training and one for testing (validation set) 
-train_pos  = all_positive_tweets[:4000]
-train_neg  = all_negative_tweets[:4000]
-
-train_x = train_pos + train_neg 
-
-print("Number of tweets: ", len(train_x))
-
-# make a numpy array representing labels of the tweets
-labels = np.append(np.ones((len(all_positive_tweets))), np.zeros((len(all_negative_tweets))))
-
 #Import the english stop words list from NLTK
 stopwords_english = stopwords.words('english') 
 
-# Our selected sample. Complex enough to exemplify each step
-tweet = all_positive_tweets[2277]
-print(tweet)
 
 def process_tweet(tweet):
     
@@ -161,83 +141,134 @@ def gradientDescent(x, y, theta, alpha, num_iters):
     J = float(J)
     return J, theta
 
-
-# choose the same tweet
-tweet = all_positive_tweets[2277]
-
-
-
-# call the imported function
-tweets_stem = process_tweet(tweet); # Preprocess a given tweet
-
-print('preprocessed tweet:')
-print(tweets_stem) # Print the result
-
-freqs = build_freqs(tweets, labels)
-
-# select some words to appear in the report. we will assume that each word is unique (i.e. no duplicates)
-keys = ['happi', 'merri', 'nice', 'good', 'bad', 'sad', 'mad', 'best', 'pretti',
-        '❤', ':)', ':(', '😒', '😬', '😄', '😍', '♛',
-        'song', 'idea', 'power', 'play', 'magnific']
-
-# list representing our table of word counts.
-# each element consist of a sublist with this pattern: [<word>, <positive_count>, <negative_count>]
-data = []
-
-# loop through our selected words
-for word in keys:
+# UNQ_C3 (UNIQUE CELL IDENTIFIER, DO NOT EDIT)
+def extract_features(tweet, freqs):
+    '''
+    Input: 
+        tweet: a list of words for one tweet
+        freqs: a dictionary corresponding to the frequencies of each tuple (word, label)
+    Output: 
+        x: a feature vector of dimension (1,3)
+    '''
+    # process_tweet tokenizes, stems, and removes stopwords
+    word_l = process_tweet(tweet)
     
-    # initialize positive and negative counts
-    pos = 0
-    neg = 0
+    # 3 elements in the form of a 1 x 3 vector
+    x = np.zeros((1, 3)) 
     
-    # retrieve number of positive counts
-    if (word, 1) in freqs:
-        pos = freqs[(word, 1)]
+    #bias term is set to 1
+    x[0,0] = 1 
+    
+    ### START CODE HERE (REPLACE INSTANCES OF 'None' with your code) ###
+    
+    # loop through each word in the list of words
+    for word in word_l:
         
-    # retrieve number of negative counts
-    if (word, 0) in freqs:
-        neg = freqs[(word, 0)]
+        # increment the word count for the positive label 1
+        x[0,1] += freqs.get((word,1),0)
         
-    # append the word counts to the table
-    data.append([word, pos, neg])
+        # increment the word count for the negative label 0
+        x[0,2] += freqs.get((word,0),0)
+        
+    ### END CODE HERE ###
+    assert(x.shape == (1, 3))
+    return x
+
+# UNQ_C4 (UNIQUE CELL IDENTIFIER, DO NOT EDIT)
+def predict_tweet(tweet, freqs, theta):
+    '''
+    Input: 
+        tweet: a string
+        freqs: a dictionary corresponding to the frequencies of each tuple (word, label)
+        theta: (3,1) vector of weights
+    Output: 
+        y_pred: the probability of a tweet being positive or negative
+    '''
+    ### START CODE HERE (REPLACE INSTANCES OF 'None' with your code) ###
     
-data
+    # extract the features of the tweet and store it into x
+    x = extract_features(tweet, freqs)
+    
+    # make the prediction using x and theta
+    y_pred = sigmoid(np.dot(x,theta))
+    
+    ### END CODE HERE ###
+    
+    return y_pred
 
-fig, ax = plt.subplots(figsize = (8, 8))
+# UNQ_C5 (UNIQUE CELL IDENTIFIER, DO NOT EDIT)
+def test_logistic_regression(test_x, test_y, freqs, theta):
+    """
+    Input: 
+        test_x: a list of tweets
+        test_y: (m, 1) vector with the corresponding labels for the list of tweets
+        freqs: a dictionary with the frequency of each pair (or tuple)
+        theta: weight vector of dimension (3, 1)
+    Output: 
+        accuracy: (# of tweets classified correctly) / (total # of tweets)
+    """
+    
+    ### START CODE HERE (REPLACE INSTANCES OF 'None' with your code) ###
+    
+    # the list for storing predictions
+    y_hat = []
+    
+    for tweet in test_x:
+        # get the label prediction for the tweet
+        y_pred = predict_tweet(tweet, freqs, theta)
+        
+        if y_pred > 0.5:
+            # append 1.0 to the list
+            y_hat.append(1)
+        else:
+            # append 0 to the list
+            y_hat.append(0)
 
-# convert positive raw counts to logarithmic scale. we add 1 to avoid log(0)
-x = np.log([x[1] + 1 for x in data])  
+    # With the above implementation, y_hat is a list, but test_y is (m,1) array
+    # convert both to one-dimensional arrays in order to compare them using the '==' operator
+    accuracy = np.asarray(y_hat)
 
-# do the same for the negative counts
-y = np.log([x[2] + 1 for x in data]) 
-
-# Plot a dot for each pair of words
-ax.scatter(x, y)  
-
-# assign axis labels
-plt.xlabel("Log Positive count")
-plt.ylabel("Log Negative count")
-
-# Add the word as the label at the same position as you added the points just before
-for i in range(0, len(data)):
-    ax.annotate(data[i][0], (x[i], y[i]), fontsize=12)
-
-ax.plot([0, 9], [0, 9], color = 'red') # Plot the red line that divides the 2 areas.
-plt.show()
+    ### END CODE HERE ###
+    
+    return accuracy
 
 
 
+# select the set of positive and negative tweets
+all_positive_tweets = twitter_samples.strings('positive_tweets.json')
+all_negative_tweets = twitter_samples.strings('negative_tweets.json')
 
-# Check the function
-# Construct a synthetic test case using numpy PRNG functions
-np.random.seed(1)
-# X input is 10 x 3 with ones for the bias terms
-tmp_X = np.append(np.ones((10, 1)), np.random.rand(10, 2) * 2000, axis=1)
-# Y Labels are 10 x 1
-tmp_Y = (np.random.rand(10, 1) > 0.35).astype(float)
+# split the data into two pieces, one for training and one for testing (validation set) 
+test_pos = all_positive_tweets[4000:]
+train_pos = all_positive_tweets[:4000]
+test_neg = all_negative_tweets[4000:]
+train_neg = all_negative_tweets[:4000]
+
+train_x = train_pos + train_neg 
+test_x = test_pos + test_neg
+
+# combine positive and negative labels
+train_y = np.append(np.ones((len(train_pos), 1)), np.zeros((len(train_neg), 1)), axis=0)
+test_y = np.append(np.ones((len(test_pos), 1)), np.zeros((len(test_neg), 1)), axis=0)
+
+freqs = build_freqs(train_x, train_y)
+
+tmp1 = extract_features(train_x[0], freqs)
+print(tmp1)
+
+# collect the features 'x' and stack them into a matrix 'X'
+X = np.zeros((len(train_x), 3))
+for i in range(len(train_x)):
+    X[i, :]= extract_features(train_x[i], freqs)
+
+# training labels corresponding to X
+Y = train_y
 
 # Apply gradient descent
-tmp_J, tmp_theta = gradientDescent(tmp_X, tmp_Y, np.zeros((3, 1)), 1e-8, 700)
-print(f"The cost after training is {tmp_J:.8f}.")
-print(f"The resulting vector of weights is {[round(t, 8) for t in np.squeeze(tmp_theta)]}")
+J, theta = gradientDescent(X, Y, np.zeros((3, 1)), 1e-9, 1500)
+print(f"The cost after training is {J:.8f}.")
+print(f"The resulting vector of weights is {[round(t, 8) for t in np.squeeze(theta)]}")
+
+# Run this cell to test your function
+for tweet in ['I am happy', 'I am bad', 'this movie should have been great.', 'great', 'great great', 'great great great', 'great great great great']:
+    print( '%s -> %f' % (tweet, predict_tweet(tweet, freqs, theta)))
